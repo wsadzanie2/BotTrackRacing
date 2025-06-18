@@ -1,3 +1,4 @@
+import time
 import pygame
 from pygame.event import Event
 from pygame.locals import *
@@ -5,6 +6,10 @@ import math
 
 screen = pygame.display.set_mode((1000, 1000), RESIZABLE)
 cars_list = []
+checkpoints_list = []
+pygame.init()
+
+font = pygame.font.SysFont(pygame.font.get_default_font(), 32)
 
 car_img = pygame.image.load("assets/sport-car.png").convert_alpha()
 track_image = pygame.image.load("assets/race-track.png").convert_alpha()
@@ -20,6 +25,37 @@ def rot_center(image, angle):
     rot_image = rot_image.subsurface(rot_rect).copy()
     return rot_image
 
+
+class Checkpoint:
+    def __init__(self, x, y, sx=50, sy=100) -> None:
+        checkpoints_list.append(self)
+        self.rect = pygame.Rect(x, y, sx, sy)
+        self.index = len(checkpoints_list) - 1
+    def draw(self, debug=False):
+        global start
+        if debug:
+            pygame.draw.rect(screen, (255, 0, 0), self.rect)
+        elif self.index == 0:
+            pygame.draw.rect(screen, (255, 255, 255), self.rect)
+        # check for collisions
+        for car in cars_list:
+            x, y = car.get_poz()
+            sx, sy = car_img.get_size()
+            if self.rect.colliderect(pygame.Rect(x, y, sx, sy)):
+                if debug:
+                    pygame.draw.rect(screen, (0, 255, 0), self.rect)
+                if car.cur_checkpoint == self.index:
+                    car.cur_checkpoint += 1
+                    print(car.cur_checkpoint)
+                elif car.cur_checkpoint == len(checkpoints_list) and self.index == 0:
+                    car.cur_checkpoint = 1
+                    print(car.cur_checkpoint)
+                    car.cur_lap_time = time.time() - start
+                    start = time.time()
+                    if car.best_lap_time is None or car.cur_lap_time < car.best_lap_time:
+                        car.best_lap_time = car.cur_lap_time
+
+
 class Car:
     def __init__(self, x=300, y=50, control='bot') -> None:
         cars_list.append(self)
@@ -30,6 +66,9 @@ class Car:
         self.topspeed = 30
         self.turning_speed = 5
         self.speed = 0
+        self.cur_checkpoint = 1
+        self.best_lap_time = None
+        self.cur_lap_time = None
     def draw(self):
         self.angle += self.angle_change * dt
         self.angle %= 360
@@ -77,6 +116,9 @@ class Car:
         self.angle += angle
         self.angle %= 360
 
+    def get_poz(self):
+        return self.x, self.y
+
     def will_hit_at(self, distance: int, rel_angle: int):
         self.angle %= 360
         rel_angle %= 360
@@ -90,23 +132,40 @@ class Car:
             return False
 
 
+Checkpoint(300 + car_img.get_width(), 40)
+Checkpoint(1400, 100)
+Checkpoint(1400, 775)
+Checkpoint(350, 700)
 
 clock = pygame.time.Clock()
 dt = 0
+start = time.time()
 def run():
-    global dt
+    global dt, start
     run = True
     dt = clock.tick() / 100
-    if dt > 0:
-        print(f"FPS: {10 / dt}")
+    # if dt > 0:
+    #     print(f"FPS: {10 / dt}")
     screen.fill((25, 125, 25))
     screen.blit(track_image, (0,0))
-    for car in cars_list:
+    # Draw time
+    screen.blit(font.render(f"{round(time.time() - start, 1)}s", True, (255, 255, 255), (0, 0, 0)), (0, 0))
+    for index, car in enumerate(cars_list):
         car.draw()
+        if car.best_lap_time is not None:
+            screen.blit(font.render(f"{round(car.best_lap_time, 2)}s", True, (255, 255, 255), (0, 0, 0)), (0, 32 + (32 * index)))
+        else:
+            screen.blit(font.render(f"None", True, (255, 255, 255), (0, 0, 0)), (0, 32 + (32 * index)))
         if car.check_collision(track_mask):
             print("Game over!")
+            if car.control != 'bot':
+                Car(300, 50, control=car.control)
+            else:
+                Car(300, 50)
+            start = time.time()
             cars_list.remove(car)
-            Car(300, 50)
+    for checkpoint in checkpoints_list:
+        checkpoint.draw()
     for event in pygame.event.get():
         for car in cars_list:
             car.update(event)
