@@ -46,7 +46,6 @@ class Checkpoint:
                     pygame.draw.rect(screen, (0, 255, 0), self.rect)
                 if car.cur_checkpoint == self.index:
                     car.cur_checkpoint += 1
-                    print(car.cur_checkpoint)
                 elif car.cur_checkpoint == len(checkpoints_list) and self.index == 0:
                     car.cur_checkpoint = 1
                     print(car.cur_checkpoint)
